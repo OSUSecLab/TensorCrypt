@@ -8,7 +8,29 @@ completeness and inherent adaptability of NN models, we propose a transformative
 
 ## Table of Content
 
-## Requirements
+### Directory Structure
+`model`: model checkpoints of AES, Chacha, and Shasa ciphers.
+`inference`: scripts to perform model inference for encryption and decryption.
+`implementations`: implementations of NN DSLs in terms of ciphers.
+
+
+## Installation & Requirements
+
+### 1. GPU Setup
+
+Install the [NVIDIA GPU driver](https://www.nvidia.com/Download/index.aspx) if you have not. You can use the following command to verify it is installed.
+
+```
+nvidia-smi
+```
+
+### 2. Create a virtual environment with pip
+
+To install the required dependencies, run the following command:
+
+```
+pip install -r requirements.txt
+```
 
 ## Citation
 
