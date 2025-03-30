@@ -9,6 +9,7 @@ from basic_block_parallel import key_expansion
 from datetime import datetime
 
 model_path = "YOUR_PATH"
+model_path = "models/aes/models/ecb_chipher"
 
 def inference():
     plaintext = '6bc1bee22e409f96e93d7e117393172a'

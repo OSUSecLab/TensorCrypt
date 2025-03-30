@@ -20,6 +20,8 @@ def inference():
     print(ciphertext)
 
 if __name__ == '__main__':
+    assert model_path != "YOUR_PATH", "Please specify the model path"
+    
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         save_to_model()
