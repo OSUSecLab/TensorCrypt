@@ -3,7 +3,6 @@
 
 import numpy as np
 
-
 # All tests were taken from NIST, 2001 test vectors:
 # https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf
 
