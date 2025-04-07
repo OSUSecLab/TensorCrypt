@@ -30,3 +30,9 @@ I0000 00:00:1743315015.877756   99410 service.cc:152] XLA service 0x368500a0 ini
 I0000 00:00:1743315015.877781   99410 service.cc:160]   StreamExecutor device (0): Host, Default Version
 I0000 00:00:1743315016.170292   99410 device_compiler.h:188] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
 ```
+
+### First-time inference
+
+In you only run inference for one time, the latency will be much higher than expected. But when we perform inference for multiple rounds, we observe the inference latency is significantly reduced. It's because of [tf.function retracing](https://www.tensorflow.org/guide/function). The [XLA team is aware of this problem](https://groups.google.com/g/xla-dev/c/WgQ-xyRj9ZQ/m/8WDsXF0pDAAJ?pli=1) and there is an ongoing effort to fix the latency for dynamic shapes.
+
+We recommand users to pre-load the model and run inference once before the large-scale encryption and decryption. In our paper, we also ignore such first-time latency (see [Appendix F. One-time Costs for Cipher Execution](https://xinjin95.github.io/assets/pdf/TensorCrypt_NDSS2025.pdf#page=14.65) for more details).
