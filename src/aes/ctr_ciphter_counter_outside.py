@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import os.path
-
 import tensorflow as tf
 import time
 import numpy as np
 from test_vectors import text2vector, get_vectors
 from basic_block_parallel import key_expansion
-from datetime import datetime
 
-model_path = "YOUR_PATH"
+model_path = "data/ctr_chipher_counter_outside"
+
 
 class Cipher(tf.Module):
 
@@ -18,8 +16,10 @@ class Cipher(tf.Module):
         super(Cipher, self).__init__()
 
     @tf.function(input_signature=[tf.TensorSpec(shape=(None, 16), dtype=tf.int32),
-                                  tf.TensorSpec(shape=(176,), dtype=tf.int32)], experimental_compile=True)
-    def __call__(self, plaintext, round_keys):
+                                  tf.TensorSpec(shape=(None, 16), dtype=tf.int32),
+                                  tf.TensorSpec(shape=(176,), dtype=tf.int32)],
+                 experimental_compile=True)
+    def __call__(self, counter, plaintext, round_keys):
         Nr = 10
         sbox = [
             0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -256,23 +256,55 @@ class Cipher(tf.Module):
             state = add_round_key(state, key)
             return state
 
-        return cipher(plaintext, round_keys)
+        counter = cipher(counter, round_keys)
+
+        # counter = tf.cast(counter, dtype=tf.int32)
+
+        ciphertext = tf.bitwise.bitwise_xor(counter, plaintext)
+
+        return ciphertext
+
+def counter_generator(counter, block_number):
+    counter = np.asarray(counter, dtype=np.uint8)
+    tmp = np.zeros(shape=(block_number, 1), dtype=np.uint8)
+    counter_input = np.add(counter, tmp)
+    counter_quotient = np.zeros(shape=(block_number,), dtype=np.int64)
+    offset = np.arange(0, block_number, dtype=np.int64)
+    for j in range(15, -1, -1):
+        col = counter_input[:,j]
+        if j == 15:
+            col = np.add(col, offset)
+        col = np.add(col, counter_quotient)
+        counter_input[:,j] = col.astype(np.uint8)
+        counter_quotient = np.right_shift(col, 8)
+    return counter_input
 
 def save_to_model():
-
     cipher = Cipher()
     # print(module(10))
     tf.saved_model.save(cipher, model_path)
 
+
 def inference():
-    plaintext = '6bc1bee22e409f96e93d7e117393172a'
+    _, counter, plaintext, ciphertext = get_vectors('ctr_128', single_block=True)
+
+    # process counter
+    counter = text2vector(counter)
+    counter = tf.constant(counter, dtype=tf.int32, shape=(1, 16))
+
+    # plaintext = '6bc1bee22e409f96e93d7e117393172a'
     plaintext = text2vector(plaintext)
-    block_num = 1000000
+    block_num = 1
     plaintext = plaintext * block_num
     plaintext = tf.constant(plaintext, dtype=tf.int32)
     plaintext = tf.reshape(plaintext, shape=(block_num, 16))
 
-    length = tf.constant(plaintext.shape[0], dtype=tf.int32)
+    length = tf.constant(block_num, dtype=tf.int32)
+
+    # # process ciphertext
+    # ciphertext = text2vector(ciphertext)
+    # ciphertext = tf.constant(ciphertext, dtype=tf.int32)
+    # ciphertext = tf.reshape(ciphertext, shape=(block_num, 16))
 
     key = '2b7e151628aed2a6abf7158809cf4f3c'
     key = text2vector(key)
@@ -283,16 +315,24 @@ def inference():
     start_time = time.time()
     cipher = tf.saved_model.load(model_path)
     model_load_time = time.time() - start_time
-    res = cipher(plaintext, round_keys)
+    res = cipher(counter, plaintext, round_keys)
     inference_time = time.time() - start_time - model_load_time
 
     # print(cipher())
     print("tflite model outputs: ", res)
     print("\t model load time used:", model_load_time)
     print('\t inference time used:', inference_time)
+    # print(ciphertext)
+
 
 def validate_correctness():
-    key, plaintext, ciphertext = get_vectors('ecb_128', single_block=False)
+    _, counter, plaintext, ciphertext = get_vectors('ctr_128', single_block=False)
+
+    # process counter
+    counter = text2vector(counter)
+    block_num = 4
+    counter = counter_generator(counter, block_num)
+    counter = tf.constant(counter, dtype=tf.int32, shape=(block_num, 16))
 
     # plaintext = '6bc1bee22e409f96e93d7e117393172a'
     plaintext = text2vector(plaintext)
@@ -317,7 +357,7 @@ def validate_correctness():
     start_time = time.time()
     cipher = tf.saved_model.load(model_path)
     model_load_time = time.time() - start_time
-    res = cipher(plaintext, round_keys)
+    res = cipher(counter, plaintext, round_keys)
     inference_time = time.time() - start_time - model_load_time
 
     # print(cipher())
@@ -326,62 +366,13 @@ def validate_correctness():
     print('\t inference time used:', inference_time)
     print(ciphertext)
 
-def profile_inference():
-    time_stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # profile_dir = f"logs/ecb/blk_{}" + time_stamp
-    # writer = tf.summary.create_file_writer(profile_dir)
-
-    key, plaintext, ciphertext = get_vectors('ecb_128', single_block=True)
-    plaintext = text2vector(plaintext)
-    block_num = 10
-    plaintext = plaintext * block_num
-    plaintext = tf.constant(plaintext, dtype=tf.int32)
-    plaintext = tf.reshape(plaintext, shape=(block_num, 16))
-
-    profile_dir = f"logs/ecb/blk_{block_num}_" + time_stamp
-    if not os.path.exists(profile_dir):
-        os.makedirs(profile_dir)
-    writer = tf.summary.create_file_writer(profile_dir)
-
-    key = text2vector(key)
-    start_time = time.time()
-    round_keys = key_expansion(key)
-    round_keys = tf.constant(round_keys, dtype=tf.int32)
-
-    cipher = tf.saved_model.load(model_path)
-
-    tart_time = time.time()
-    res = cipher(plaintext, round_keys)
-    first_inference_time = time.time() - start_time
-    print("First inference time:", first_inference_time)
-
-    total_time = 0
-    num_iter = 10
-
-    for j in range(num_iter):
-        print("iter:", j)
-        tf.summary.trace_on(graph=True, profiler=True)
-        start_time = time.time()
-        res = cipher(plaintext, round_keys)
-        inference_time = time.time() - start_time
-        print("input_shape:", plaintext.shape, "result shape:", res.shape)
-        total_time += inference_time
-        with writer.as_default():
-            tf.summary.trace_export(
-                name="inference_trace",
-                step=j,
-                profiler_outdir=profile_dir)
-    average_time = total_time / num_iter
-    print("Average inference time:", average_time)
 
 if __name__ == '__main__':
     assert model_path != "YOUR_PATH", "Please specify the model path"
 
-
     strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-    # with tf.device('/cpu:0'):
+    # with strategy.scope():
+    with tf.device('/cpu:0'):
         save_to_model()
         inference()
-        validate_correctness()
-        # profile_inference()
+        # validate_correctness()
