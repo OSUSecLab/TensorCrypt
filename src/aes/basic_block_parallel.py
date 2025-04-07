@@ -6,7 +6,7 @@ import time
 import numpy as np
 from test_vectors import text2vector, get_vectors
 
-model_path = "data/basic_block_parallel"
+model_path = "YOUR_PATH"
 
 def key_expansion(key, nr=10):
     # nk, nb = 4, 4
