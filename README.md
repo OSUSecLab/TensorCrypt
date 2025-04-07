@@ -13,7 +13,9 @@ completeness and inherent adaptability of NN models, we propose a transformative
 
 `inference`: scripts to perform model inference for encryption and decryption.
 
-`implementations`: implementations of NN DSLs in terms of ciphers.
+`src`: implementations of NN DSLs in terms of ciphers.
+
+`mobile`: Android app used to test TensorCrypto models.
 
 
 ## Installation & Requirements
