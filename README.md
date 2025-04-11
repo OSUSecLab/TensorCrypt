@@ -36,11 +36,6 @@ To install the required dependencies, run the following command:
 pip install -r requirements.txt
 ```
 
-## TODO
-
-Add model checkpoints for iot and model devices
-Add demonstration app
-
 ## Trouble Shotting
 
 See this [doc](trouble-shotting.md) for known issues.
